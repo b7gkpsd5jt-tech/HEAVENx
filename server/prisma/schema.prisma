@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum SeriesStatus {
+  ONGOING
+  COMPLETED
+  HIATUS
+  DROPPED
+}
+
+enum ReadMode {
+  NORMAL
+  INVERT
+  CLASSIC_INVERT
+  GRAYSCALE
+  SEPIA
+}
+
+enum Language {
+  DE
+  EN
+  FA
+}
+
+model User {
+  id              String    @id @default(cuid())
+  username        String    @unique
+  email           String?   @unique
+  password        String
+  role            Role      @default(USER)
+  isActive        Boolean   @default(true)
+  language        Language  @default(DE)
+  readMode        ReadMode  @default(NORMAL)
+  darkMode        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+
+  favorites       Favorite[]
+  readingHistory  ReadingHistory[]
+  readingProgress ReadingProgress[]
+  refreshTokens   RefreshToken[]
+
+  @@map("users")
+}
+
+model Series {
+  id              String        @id @default(cuid())
+  title           String
+  altTitle        String?
+  description     String?
+  cover           String?
+  banner          String?
+  author          String?
+  artist          String?
+  status          SeriesStatus  @default(ONGOING)
+  releaseDate     DateTime?
+  popularity      Int           @default(0)
+  likes           Int           @default(0)
+  views           Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  genres          SeriesGenre[]
+  tags            SeriesTag[]
+  chapters        Chapter[]
+  favorites       Favorite[]
+
+  @@map("series")
+}
+
+model Genre {
+  id      String    @id @default(cuid())
+  name    String    @unique
+  series  SeriesGenre[]
+  @@map("genres")
+}
+
+model Tag {
+  id      String    @id @default(cuid())
+  name    String    @unique
+  series  SeriesTag[]
+  @@map("tags")
+}
+
+model SeriesGenre {
+  seriesId String
+  genreId  String
+  series   Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  genre    Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  @@id([seriesId, genreId])
+  @@map("series_genres")
+}
+
+model SeriesTag {
+  seriesId String
+  tagId    String
+  series   Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([seriesId, tagId])
+  @@map("series_tags")
+}
+
+model Chapter {
+  id              String    @id @default(cuid())
+  seriesId        String
+  number          Int
+  title           String?
+  uploadDate      DateTime  @default(now())
+  views           Int       @default(0)
+  sortOrder       Int
+  pageCount       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  series          Series    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  pages           ChapterPage[]
+  readingHistory  ReadingHistory[]
+  readingProgress ReadingProgress[]
+
+  @@unique([seriesId, number])
+  @@map("chapters")
+}
+
+model ChapterPage {
+  id        String  @id @default(cuid())
+  chapterId String
+  pageNumber Int
+  filePath  String
+  fileName  String
+  order     Int
+
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, pageNumber])
+  @@map("chapter_pages")
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  seriesId  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seriesId])
+  @@map("favorites")
+}
+
+model ReadingHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  seriesId   String
+  chapterId  String
+  page       Int      @default(1)
+  readAt     DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series     Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@map("reading_history")
+}
+
+model ReadingProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  seriesId  String
+  chapterId String
+  page      Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chapterId])
+  @@map("reading_progress")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
